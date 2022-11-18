@@ -23,7 +23,7 @@ local setmetatable = setmetatable
 
 -- LuaFormatter off
 local _M = {
-    _VERSION = '0.06'
+    _VERSION = '0.07'
 }
 
 if not ngx.config
@@ -860,6 +860,40 @@ function _M.status_page()
         add_peers_info(stats_tab, u, peers, "BACKUP")
     end
     return concat(stats_tab.statuses)
+end
+
+function _M.get_alive_peer(pool, protocol)
+    -- get an url of the first alive actively checked upstream
+    local proto = "https"
+    if protocol then
+        proto = protocol
+    end
+    local us, err = get_upstreams()
+    if not us then
+        return "failed to get upstream names: " .. err
+    end
+    local n = #us
+    for i = 1, n do
+        local u = us[i]
+        if u == pool then
+            local ncheckers = upstream_checker_statuses[u]
+            if ncheckers then
+                local peers, err = get_primary_peers(u)
+                if not peers then
+                    return nil
+                end
+                for p in ipairs(peers) do
+                    if not peers[p]["down"] then
+                        return proto .. "://" .. peers[p]["name"]
+                    else
+                        goto continue
+                    end
+                    ::continue::
+                end
+            end
+            return nil
+        end
+    end
 end
 
 return _M
